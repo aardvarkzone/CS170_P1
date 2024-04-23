@@ -2,8 +2,61 @@ P1a report:
 Group Members: 
     Advait Arumugam - 6451041
     Kavya Verma - 7220411
-    Bryce Wang - 
+    Bryce Wang - 5812870
+
+We all worked on this together using VS live share. 
 
 Design Ideas: 
+We initially looked at the textbook and the section slides to get started.
+The basic implementation from the textbook uses "Lock" and "CV" as their class names, but
+we needed to import pthread.h in our files in order to be able to use the pthread_mutex
+and pthread_cond functionalities We realized this after looking at the section slides.
 
 Code Summary: 
+
+We defined our constructor and destructor for the RWLock:
+
+RWLock::RWLock()
+- initialized the lock and condition variables for read and write.
+- initialized the counters for active and waiting readers, and active and waiting writers.
+
+RWLock::~RWLock()
+- deletes the lock and condition variables.
+
+RWLock::startRead()
+- acquires a lock and checks if a read operation should wait by calling readShouldWait(). 
+- a read should wait if there are any active or waiting writers. 
+- if the above is true it waits on the readGo condition variable. 
+- once finished, decrements waitingReaders and increments activeReaders 
+- releases the lock.
+
+RWLock::doneRead()
+- decrements activeReaders when a reader finishes. 
+- If it was the last active reader and there are waiting writers, it signals the writeGo condition variable to allow writers to proceed. 
+- The lock is then released.
+
+RWLock::startWrite() 
+- first acquires lock.
+- increments waitingWriters.
+- check is there is an active write operation with writeShouldWait().
+    - wait if active write/read --> determined by writeGo.
+- when ready, decrements waitingWriters and increments activeWriters.
+- releases lock.
+
+RWLock::doneWrite()
+- acquires lock.
+- decrements activeWriters and asserts that no other writers are active. 
+- if waiting writers > 0, it signals the next writer to proceed using writeGo. 
+- if no writers are waiting (else condition), it broadcasts to waiting readers through readGo to proceed.
+- releases lock.
+
+RWLock::readShouldWait()
+- helper function.
+- returns true if there any active/waiting writers.
+- writers are preferred.
+
+RWLock::writeShouldWait()
+- helper function.
+- returns true if there are any active readers/writers.
+- exclusive for writers and prevents new writes during an active write.
+

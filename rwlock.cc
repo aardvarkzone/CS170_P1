@@ -1,5 +1,7 @@
 #include<stdio.h>
 #include <pthread.h>
+#include <assert.h>
+
 #include <iostream> 
 
 
@@ -7,9 +9,9 @@
 
 //Your solution to implement each of the following methods
 RWLock::RWLock() {
-    pthread_mutex_init(&mutex, NULL);
-    pthread_cond_init(&okToRead, NULL);
-    pthread_cond_init(&okToWrite, NULL);
+    pthread_mutex_init(&lock, NULL);
+    pthread_cond_init(&readGo, NULL);
+    pthread_cond_init(&writeGo, NULL);
 
     activeReaders = 0;
     activeWriters = 0;
@@ -18,54 +20,69 @@ RWLock::RWLock() {
 }
 
 RWLock::~RWLock() {
-    pthread_mutex_destroy(&mutex);
-    pthread_cond_destroy(&okToRead);
-    pthread_cond_destroy(&okToWrite);
+    pthread_mutex_destroy(&lock);
+    pthread_cond_destroy(&readGo);
+    pthread_cond_destroy(&writeGo);
 }
 
 // Wait until no active or waiting writes, then proceed
 void RWLock::startRead() {
-    lock.acquire();
+    // lock.acquire();
+    pthread_mutex_lock(&lock);
     while (readShouldWait()) {
-        readGo.Wait(&lock);
+        // readGo.Wait(&lock);
+        pthread_cond_wait(&readGo, &lock);
     }
-    lock.release(); 
+    waitingReaders--;
+    activeReaders++;
+    // lock.release();
+    pthread_mutex_unlock(&lock); 
 }
 
 // Done reading. If no other active reads, a write may proceed
 void RWLock::doneRead() {
-    lock.acquire();
+    // lock.acquire();
+    pthread_mutex_lock(&lock);
     activeReaders--;
     if (activeReaders == 0
         && waitingWriters > 0) {
-        writeGo.signal();
+        // writeGo.signal();
+        pthread_cond_signal(&writeGo);
     }
-    lock.release();
+    // lock.release();
+    pthread_mutex_unlock(&lock); 
 }
 
 // Wait until no active read or write then proceed
 void RWLock::startWrite() {
-    lock.acquire();
+    // lock.acquire();
+    pthread_mutex_lock(&lock);
     waitingWriters++; 
     while (writeShouldWait()) {
-        writeGo.Wait(&lock);
+        // writeGo.Wait(&lock);
+        pthread_cond_wait(&writeGo, &lock);
     }
     waitingWriters--; 
     activeWriters++; 
-    lock.release();
+    // lock.releaase();
+    pthread_mutex_unlock(&lock); 
 }
 
 // Done writing. A waiting write or read may proceed
 void RWLock::doneWrite() {
-    lock.acquire();
+    // lock.acquire();
+    pthread_mutex_lock(&lock);
     activeWriters--;
     assert(activeWriters == 0);
     if (waitingWriters > 0) {
-        writeGo.signal();
+        // writeGo.signal();
+        pthread_cond_signal(&writeGo);
     } else {
-        readGo.broadcast();
+        // readGo.broadcast();
+        pthread_cond_broadcast(&readGo);
     }
-    lock.release();
+    // lock.release();
+    pthread_mutex_unlock(&lock); 
 }
 
 // Read waits if any active or waiting write ("writers preferred")
